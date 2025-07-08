@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query
 import httpx
-import connect
+from backend import connect
+import re
 
 app = FastAPI()
 
@@ -22,7 +23,24 @@ async def search_entity(
     url = f"https://musicbrainz.org/ws/2/{entity}?query={query}&limit={limit}&offset={offset}&fmt=json"
     async with httpx.AsyncClient() as client:
         response = await client.get(url)
-        return response.json()
+        data = response.json()
+
+    if entity == "recording" and "recordings" in data:
+        seen = set()
+        deduped = []
+
+        for rec in data["recordings"]:
+            title = rec.get("title", "")
+            artist = rec.get("artist-credit", [{}])[0].get("name", "")
+            key = (title.lower(), artist.lower())
+
+            if key not in seen and re.fullmatch(r"[A-Za-z0-9 ]+", title):
+                seen.add(key)
+                deduped.append(rec)
+
+        data["recordings"] = deduped
+
+    return data
 
 
 @app.post("/create_playlist/{name}/{email}")
@@ -70,7 +88,7 @@ def create_user(username: str, email: str):
 async def add_song(artist: str, title: str, playlist_id: int):
     cursor = conn.cursor()
 
-    url = f"https://musicbrainz.org/ws/2/recording/?query=artist:{artist}%20AND%20recording{title}&fmt=json"
+    url = f"https://musicbrainz.org/ws/2/recording/?query=artist:{artist} AND recording:{title}&fmt=json"
     async with httpx.AsyncClient() as client:
         response = await client.get(url)
         answer = response.json()
@@ -116,9 +134,22 @@ async def add_song(artist: str, title: str, playlist_id: int):
         return {"status": "failure", "message": "Song not found on MusicBrainz"}
 
 
+@app.get("/get_playlists/{user_id}")
+async def get_playlists(user_id: int):
+    cursor = conn.cursor()
+    cursor.execute("SELECT name, playlist_id FROM playlists WHERE user_id = %s", (user_id,))
+    results = cursor.fetchall()
 
+    playlists = [{"name": name, "id": pid} for name, pid in results]
 
-
+    return {"playlists": playlists}
 @app.get("/hello/{name}")
 async def say_hello(name: str):
     return {"message": f"Hello {name}"}
+
+@app.get("/get_user_id/{email}")
+async def get_user_id(email: str):
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM users WHERE email = %s", (email,))
+    uid = cursor.fetchone()
+    return {"user_id": uid[0] if uid else None}
