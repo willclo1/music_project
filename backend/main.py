@@ -2,6 +2,10 @@ from fastapi import FastAPI, Query
 import httpx
 from backend import connect
 import re
+import re
+import urllib.parse
+from fastapi import FastAPI, Query, HTTPException
+import httpx
 
 app = FastAPI()
 
@@ -10,36 +14,61 @@ conn = connect.connect()
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "api root"}
 
+app = FastAPI()
 
 @app.get("/search/{entity}")
 async def search_entity(
     entity: str,
-    query: str = Query(...),
-    limit: int = Query(25),
-    offset: int = Query(0)
+    query: str = Query(None, description="Song title to search for"),
+    artist: str = Query(None, description="Artist name to search for"),
+    limit: int = Query(25, ge=1, le=100),
+    offset: int = Query(0, ge=0)
 ):
-    url = f"https://musicbrainz.org/ws/2/{entity}?query={query}&limit={limit}&offset={offset}&fmt=json"
+    # only recording entity supports title/artist combination
+    if entity != "recording":
+        raise HTTPException(status_code=400,
+                            detail="Only 'recording' searches are supported here")
+
+    # build a Lucene query
+    clauses = []
+    if query:
+        clauses.append(f'recording:"{query}"')
+    if artist:
+        clauses.append(f'artist:"{artist}"')
+    if not clauses:
+        raise HTTPException(status_code=400,
+            detail="You must supply at least one of `query` (song title) or `artist`")
+
+    lucene_q = " AND ".join(clauses)
+    url = (
+        "https://musicbrainz.org/ws/2/recording?"
+        + f"query={urllib.parse.quote(lucene_q)}"
+        + f"&limit={limit}&offset={offset}&fmt=json"
+    )
+
     async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        data = response.json()
+        resp = await client.get(url)
+        resp.raise_for_status()
+        data = resp.json()
 
-    if entity == "recording" and "recordings" in data:
-        seen = set()
-        deduped = []
+    # dedupe & filter to alphanumeric titles only
+    seen = set()
+    deduped = []
+    for rec in data.get("recordings", []):
+        title = rec.get("title", "")
+        artist_name = rec.get("artist-credit", [{}])[0].get("name", "")
+        key = (title.lower(), artist_name.lower())
+        if key in seen:
+            continue
 
-        for rec in data["recordings"]:
-            title = rec.get("title", "")
-            artist = rec.get("artist-credit", [{}])[0].get("name", "")
-            key = (title.lower(), artist.lower())
+        # allow only simple alphanumeric+spaces titles
+        if re.fullmatch(r"[A-Za-z0-9 ]+", title):
+            seen.add(key)
+            deduped.append(rec)
 
-            if key not in seen and re.fullmatch(r"[A-Za-z0-9 ]+", title):
-                seen.add(key)
-                deduped.append(rec)
-
-        data["recordings"] = deduped
-
+    data["recordings"] = deduped
     return data
 
 
@@ -153,3 +182,28 @@ async def get_user_id(email: str):
     cursor.execute("SELECT user_id FROM users WHERE email = %s", (email,))
     uid = cursor.fetchone()
     return {"user_id": uid[0] if uid else None}
+
+@app.get('/get_songs_in_playlist/{playlist_id}')
+async def get_songs_in_playlist(playlist_id: int):
+    cursor = conn.cursor();
+    cursor.execute("SELECT song_id from playlist_songs WHERE playlist_id = %s", (playlist_id,))
+    songs = cursor.fetchall()
+
+    print(songs)
+    song_list = []
+    for song in songs:
+        song_id = song[0]
+        print(song_id)
+        cursor.execute("select title, artist, duration from songs where song_id = %s", (song_id,))
+        result = cursor.fetchone()
+        if result:
+            title, artist, duration = result
+            song_list.append({
+                "title": title,
+                "artist": artist,
+                "duration": duration
+            })
+
+    print(song_list)
+
+    return {"songs": song_list}

@@ -120,6 +120,6 @@ class LoginScreen(BoxLayout):
         if self.screen_manager.has_screen("dashboard"):
             self.screen_manager.remove_widget(self.screen_manager.get_screen("dashboard"))
 
-        dashboard_screen = DashboardWrapper(user_email=email, name="dashboard")
+        dashboard_screen = DashboardWrapper(user_email=email, name="dashboard", screen_manager=self.screen_manager)
         self.screen_manager.add_widget(dashboard_screen)
         self.screen_manager.current = "dashboard"

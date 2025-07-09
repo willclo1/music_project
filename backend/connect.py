@@ -6,7 +6,7 @@ def connect():
             user="root",
             password="root",
             host="localhost",
-            port=3306,  # Default MariaDB port
+            port=3306,
             database="music"
         )
         return conn
