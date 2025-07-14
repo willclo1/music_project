@@ -1,4 +1,4 @@
-from kivy.app import App
+from kivymd.app import MDApp
 from kivy.uix.screenmanager import ScreenManager, Screen
 from screens.login_screen import LoginScreen
 from screens.dashboard_screen import DashboardScreen
@@ -17,7 +17,7 @@ class DashboardWrapper(Screen):
         self.dashboard_screen.set_user_email(email)
 
 
-class PlaylistApp(App):
+class PlaylistApp(MDApp):
     def build(self):
         sm = ScreenManager()
 

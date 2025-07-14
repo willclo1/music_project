@@ -1,85 +1,94 @@
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivy.uix.textinput import TextInput
-from kivy.uix.button import Button
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.label import MDLabel
+from kivymd.uix.textfield import MDTextField
+from kivymd.uix.button import MDRectangleFlatButton
+from kivymd.uix.card import MDCard
+from kivymd.uix.screen import MDScreen
 from kivy.clock import Clock
 from kivy.graphics import Color, RoundedRectangle
-import threading
-import requests
+import threading, requests
 
-
-class LoginScreen(BoxLayout):
+class LoginScreen(MDScreen):
     def __init__(self, screen_manager, **kwargs):
-        super().__init__(orientation='vertical', spacing=30, padding=[60, 80, 60, 80], **kwargs)
+        super().__init__(**kwargs)
         self.screen_manager = screen_manager
         self.user_id = None
 
-        # Background styling
+        # Gradient-ish background
         with self.canvas.before:
-            Color(0.08, 0.1, 0.18, 1)  # Deep midnight blue
-            self.bg = RoundedRectangle(radius=[12], pos=self.pos, size=self.size)
+            Color(0.05, 0.06, 0.1, 1)
+            self.bg = RoundedRectangle(pos=self.pos, size=self.size, radius=[0])
         self.bind(pos=self.update_bg, size=self.update_bg)
 
-        # Title
-        title = Label(
+        # ——— Card Container ———
+        card = MDCard(
+            orientation="vertical",
+            padding=40,
+            spacing=25,
+            size_hint=(None, None),
+            size=(500, 550),
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+            elevation=15,
+            md_bg_color=(0.1, 0.12, 0.2, 0.97),
+            radius=[20],
+        )
+        self.add_widget(card)
+
+        # ——— Title ———
+        card.add_widget(MDLabel(
             text="Welcome to Playlist Studio",
-            font_size=36,
-            bold=True,
-            size_hint_y=None,
-            height=70,
-            color=(0.9, 0.95, 1, 1)
-        )
-        self.add_widget(title)
+            halign="center",
+            font_style="H4",
+            theme_text_color="Custom",
+            text_color=(0.9, 0.95, 1, 1)
+        ))
 
-        # Username field
-        self.username_input = TextInput(
+        # ——— Username Field ———
+        self.username_input = MDTextField(
             hint_text="Username",
-            font_size=20,
-            multiline=False,
+            mode="rectangle",
             size_hint_y=None,
             height=60,
-            padding=[15, 15],
-            background_color=(0.18, 0.18, 0.28, 1),
-            foreground_color=(1, 1, 1, 1),
-            cursor_color=(1, 1, 1, 1)
+            font_size="18sp",
+            text_color_focus=(1, 1, 1, 1)
         )
-        self.add_widget(self.username_input)
+        card.add_widget(self.username_input)
 
-        # Email field
-        self.email_input = TextInput(
+
+
+        # ——— Email Field ———
+        self.email_input = MDTextField(
             hint_text="Email",
-            font_size=20,
-            multiline=False,
+            mode="rectangle",
             size_hint_y=None,
             height=60,
-            padding=[15, 15],
-            background_color=(0.18, 0.18, 0.28, 1),
-            foreground_color=(1, 1, 1, 1),
-            cursor_color=(1, 1, 1, 1)
+            font_size="18sp",
+            text_color_focus=(1, 1, 1, 1)
         )
-        self.add_widget(self.email_input)
+        card.add_widget(self.email_input)
 
-        # Status label
-        self.status_label = Label(
+        # ——— Status Label ———
+        self.status_label = MDLabel(
             text="",
-            font_size=16,
-            size_hint_y=None,
-            height=40,
-            color=(1, 0.4, 0.4, 1)
+            halign="center",
+            theme_text_color="Custom",
+            text_color=(1, 0.4, 0.4, 1),
+            font_style="Caption"
         )
-        self.add_widget(self.status_label)
+        card.add_widget(self.status_label)
 
-        # Sign-in button
-        login_btn = Button(
+        # ——— Sign-In Button ———
+        login_btn = MDRectangleFlatButton(
             text="Sign In or Create Account",
-            size_hint_y=None,
-            height=60,
-            font_size=20,
-            background_color=[0.4, 0.7, 1, 1],
-            color=[1, 1, 1, 1]
+            pos_hint={"center_x": 0.5},
+            size_hint=(None, None),
+            size=(260, 48),
+            theme_text_color="Custom",
+            text_color=(1, 1, 1, 1),
+            line_color=(0.4, 0.7, 1, 1),
         )
-        login_btn.bind(on_press=self.authenticate)
-        self.add_widget(login_btn)
+        login_btn.bind(on_release=self.authenticate)
+        card.add_widget(login_btn)
 
     def update_bg(self, *args):
         self.bg.pos = self.pos
@@ -116,10 +125,8 @@ class LoginScreen(BoxLayout):
     def go_to_dashboard(self, *args):
         from frontend.main import DashboardWrapper
         email = self.email_input.text.strip()
-
         if self.screen_manager.has_screen("dashboard"):
             self.screen_manager.remove_widget(self.screen_manager.get_screen("dashboard"))
-
         dashboard_screen = DashboardWrapper(user_email=email, name="dashboard", screen_manager=self.screen_manager)
         self.screen_manager.add_widget(dashboard_screen)
         self.screen_manager.current = "dashboard"
