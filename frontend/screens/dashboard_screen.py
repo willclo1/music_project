@@ -4,12 +4,16 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.card import MDCard
 from kivymd.uix.label import MDLabel
 from kivymd.uix.textfield import MDTextField
-from kivymd.uix.button import MDRaisedButton, MDFlatButton, MDFloatingActionButton
+from kivymd.uix.button import MDRaisedButton, MDFlatButton, MDFloatingActionButton, MDIconButton
 from kivymd.uix.menu import MDDropdownMenu
 from kivy.utils import get_color_from_hex
 from kivy.clock import Clock
 import threading
 import requests
+import json
+
+from frontend.client import MySocket
+
 
 class DashboardScreen(MDScreen):
     def __init__(self, user_email, screen_manager, **kwargs):
@@ -40,6 +44,26 @@ class DashboardScreen(MDScreen):
             text_color=(1, 1, 1, 1)
         ))
         root.add_widget(header)
+
+        # Collaborator Display Section
+        self.collab_label = MDLabel(
+            text="Available Collaborators:",
+            font_style="Subtitle1",
+            theme_text_color="Custom",
+            text_color=(1, 1, 1, 1),
+            size_hint_y=None,
+            height=32
+        )
+
+        self.collab_list = MDBoxLayout(
+            orientation="vertical",
+            spacing=8,
+            size_hint_y=None,
+            height=120
+        )
+
+        root.add_widget(self.collab_label)
+        root.add_widget(self.collab_list)
 
         # Cards container (vertically centered)
         cards_row = MDBoxLayout(
@@ -72,6 +96,15 @@ class DashboardScreen(MDScreen):
             size_hint_y=None,
             height=50
         )
+        btn_collaborate = MDRaisedButton(
+            text="Collaborate",
+            size_hint=(None, None),
+            size=(160, 48),
+            md_bg_color=get_color_from_hex("#00BCD4"),  # Optional: distinct color
+            pos_hint={"center_x": 0.5}
+        )
+        btn_collaborate.bind(on_release=lambda *args: self.collaborate())
+        create_card.add_widget(btn_collaborate)
         create_card.add_widget(self.playlist_input)
         btn_create = MDRaisedButton(
             text="Create",
@@ -224,6 +257,8 @@ class DashboardScreen(MDScreen):
         screen.load_playlist(self.user_email, pid)
         self.screen_manager.current = "playlist_detail"
 
+
+
     def go_to_search(self, *args):
         from frontend.screens.search_screen import SearchScreen
         if not self.screen_manager.has_screen("search"):
@@ -236,3 +271,112 @@ class DashboardScreen(MDScreen):
             self.screen_manager.get_screen("search").update_playlist_map(self.playlist_map)
 
         self.screen_manager.current = "search"
+
+    def collaborate(self):
+        def _fetch_friends():
+            try:
+                # Step 1: Tell the server you're looking to collaborate (WAITING)
+                if not hasattr(self, 'socket') or self.socket is None:
+                    self.socket = MySocket(host="localhost", port=50000)
+                    self.socket.request_action(username=self.user_email, playlist_id=None, action="WAITING")
+
+                # Step 2: Now fetch list of others who are also WAITING
+                self.socket.request_users()
+
+                responses = self.socket.get_responses()
+                print(responses)
+                friends = set()
+
+                for resp in responses:
+                    friends.update(resp.get("waiting_users", []))
+                    friends.update(resp.get("active_users", []))
+
+                print(friends)
+                # Optionally convert back to list if needed
+                friends = list(friends)
+
+                def ui(dt):
+                    self._render_user_list(friends)
+
+                Clock.schedule_once(ui)
+            except Exception as e:
+                print("Friend fetch error:", e)
+
+        threading.Thread(target=_fetch_friends, daemon=True).start()
+
+
+    def start_collab_with_friend(self, friend):
+
+        sel = self.playlist_button.text
+        playlist_id = self.playlist_map.get(sel)
+        if not playlist_id:
+            print("No playlist selected")
+            return
+
+        # Send JOIN action to collab server for both users
+        try:
+            self.socket.request_action(username=self.user_email, playlist_id=playlist_id, action="INVITE", target=friend)
+
+            print(f"Invite sent to {friend} on playlist ID {playlist_id}")
+        except Exception as e:
+            print("Collab start error:", e)
+
+    def _render_user_list(self, friend_list):
+        self.collab_list.clear_widgets()
+
+        for friend in sorted(friend_list):
+            if friend != self.user_email:
+                friend_card = MDCard(
+                    size_hint_y=None,
+                    height=64,
+                    md_bg_color=get_color_from_hex("#2C2E3A"),
+                    radius=[12],
+                    elevation=6,
+                    padding=[8, 8, 8, 8],
+                )
+
+                inner_box = MDBoxLayout(
+                    orientation="horizontal",
+                    spacing=12,
+                    size_hint=(1, None),
+                    height=48,
+                    pos_hint={"center_y": 0.5}
+                )
+
+                avatar = MDIconButton(
+                    icon="account",
+                    theme_text_color="Custom",
+                    text_color=(0.7, 0.9, 1, 1),
+                    size_hint=(None, None),
+                    size=(32, 32),
+                    pos_hint={"center_y": 0.5}
+                )
+
+                name_label = MDLabel(
+                    text=friend,
+                    theme_text_color="Custom",
+                    text_color=(1, 1, 1, 1),
+                    font_style="Subtitle1",
+                    halign="left",
+                    valign="middle"
+                )
+
+                collab_button = MDRaisedButton(
+                    text="Invite",
+                    md_bg_color=get_color_from_hex("#00BCD4"),
+                    size_hint=(None, None),
+                    size=(100, 36),
+                    pos_hint={"center_y": 0.5},
+                    on_release=lambda x, f=friend: self.start_collab_with_friend(f)
+                )
+
+                inner_box.add_widget(avatar)
+                inner_box.add_widget(name_label)
+                inner_box.add_widget(collab_button)
+                friend_card.add_widget(inner_box)
+                self.collab_list.add_widget(friend_card)
+
+    def close_socket(self):
+        if hasattr(self, 'socket') and self.socket:
+            self.socket.sock.close()
+            self.socket = None

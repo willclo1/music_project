@@ -1,7 +1,7 @@
 from kivymd.app import MDApp
 from kivy.uix.screenmanager import ScreenManager, Screen
-from screens.login_screen import LoginScreen
-from screens.dashboard_screen import DashboardScreen
+from frontend.screens.login_screen import LoginScreen
+from frontend.screens.dashboard_screen import DashboardScreen
 from kivy.core.window import Window
 
 class LoginWrapper(Screen): pass
