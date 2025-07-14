@@ -9,4 +9,4 @@ A desktop app made in python that allows users to create custom playlists and se
 - Spotify integration
 - Collaborative playlist creation
 - Explore page
-- UI improvments(Major changes)
+- UI improvments
