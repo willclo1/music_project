@@ -3,7 +3,7 @@ A desktop app made in python that allows users to create custom playlists and se
 
 ## Current features
 - Search by artist and song
-- Create/build songs
+- Create/build playlists
 
 ## Upcoming features
 - Spotify integration
