@@ -12,6 +12,8 @@ class CollaborationServer:
         self.serversocket = socket.socket()
         self.active_users = {}
         self.actions = []
+        self.user_invites = {}
+
         self.waiting_users = set()
         self.user_lock = threading.Lock()
 
@@ -65,9 +67,13 @@ class CollaborationServer:
         clientsocket.send((json.dumps(response) + "\n").encode('utf-8'))
     def handle_invite(self, username,target_username,playlist_id, clientsocket):
         print(f"{username }Inviting {target_username} to join playlist {playlist_id}")
-
+        self.user_invites.setdefault(target_username, []).append(username)
         response = {"status": "ok", "message": f"{target_username} invite sent"}
         clientsocket.send((json.dumps(response) + "\n").encode('utf-8'))
+
+    def handle_get_invite(self, clientsocket, username, playlist_id):
+        invites = self.user_invites.get(username, [])
+        clientsocket.send((json.dumps(invites) + "\n").encode('utf-8'))
 
     def start(self):
         self.serversocket.bind((self.host, self.port))
@@ -96,9 +102,11 @@ class CollaborationServer:
                     request = parsed.get('request')
                     username = parsed.get('username')
                     playlist_id = parsed.get('playlist_id')
-
+                    print(f"{username} request: {request}")
                     if request == 'GET_USERS':
                         self.handle_get_users(clientsocket)
+                    elif request == 'GET_INVITES':
+                        self.handle_get_invite(clientsocket, username, playlist_id)
                     elif action == 'WAITING':
                         self.handle_waiting(username, clientsocket)
                     elif action == "JOIN":
@@ -118,6 +126,11 @@ class CollaborationServer:
                 break
 
         clientsocket.close()
+
+
+
+
+
 if __name__ == '__main__':
     server = CollaborationServer()
     server.start()

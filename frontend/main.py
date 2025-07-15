@@ -9,8 +9,9 @@ class LoginWrapper(Screen): pass
 
 class DashboardWrapper(Screen):
     def __init__(self, user_email, screen_manager, **kwargs):
+        socket = kwargs.pop("socket", None)
         super().__init__(**kwargs)
-        self.dashboard_screen = DashboardScreen(user_email, screen_manager=screen_manager)
+        self.dashboard_screen = DashboardScreen(user_email, screen_manager=screen_manager,socket=socket)
         self.add_widget(self.dashboard_screen)
 
     def set_user_email(self, email):

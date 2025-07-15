@@ -124,9 +124,28 @@ class LoginScreen(MDScreen):
 
     def go_to_dashboard(self, *args):
         from frontend.main import DashboardWrapper
+
         email = self.email_input.text.strip()
+
+        # Set up the collaboration socket
+        try:
+            from frontend.client import MySocket
+            self.socket = MySocket(host="localhost", port=50000)
+            self.socket.request_action(username=email, playlist_id=None, action="WAITING")
+            print("Joined collaboration server in WAITING mode.")
+        except Exception as e:
+            print("Socket setup error:", e)
+            self.socket = None  # Fallback so we don't pass garbage
+
         if self.screen_manager.has_screen("dashboard"):
             self.screen_manager.remove_widget(self.screen_manager.get_screen("dashboard"))
-        dashboard_screen = DashboardWrapper(user_email=email, name="dashboard", screen_manager=self.screen_manager)
+
+        dashboard_screen = DashboardWrapper(
+            user_email=email,
+            name="dashboard",
+            screen_manager=self.screen_manager,
+            socket=self.socket,
+        )
+
         self.screen_manager.add_widget(dashboard_screen)
         self.screen_manager.current = "dashboard"

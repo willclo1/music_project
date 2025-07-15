@@ -26,6 +26,15 @@ class MySocket:
         }
         json_data = json.dumps(data) +"\n"
         self.sock.send(json_data.encode('utf-8'))
+    def request_invites(self, username, playlist_id):
+        data = {
+            "request": "GET_INVITES",
+            "username": username,
+            "playlist_id": playlist_id
+        }
+        json_data = json.dumps(data) + "\n"
+        self.sock.send(json_data.encode('utf-8'))
+
 
     def get_responses(self):
         buffer = ""
