@@ -1,20 +1,21 @@
+import requests
+from kivy._event import partial
 from kivy.clock import Clock
+from kivy.utils import get_color_from_hex
+from kivy.metrics import dp
 from kivymd.uix.label import MDLabel
-from kivymd.uix.screen import MDScreen
 from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.screen import MDScreen
 from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.list import MDList, OneLineAvatarListItem, IconLeftWidget
 from kivymd.uix.button import MDRaisedButton
 from kivymd.uix.menu import MDDropdownMenu
-from kivymd.uix.toolbar import MDTopAppBar
 from kivymd.uix.snackbar import MDSnackbar
-from kivy.metrics import dp
+from kivymd.uix.toolbar import MDTopAppBar
 import threading
-from functools import partial
-import requests
 
 class FriendsCenter(MDScreen):
-    def __init__(self, user_email, friend_list, socket,**kwargs):
+    def __init__(self, user_email, friend_list, socket, **kwargs):
         super().__init__(**kwargs)
         self.user_email = user_email
         self.friend_list = friend_list
@@ -22,37 +23,67 @@ class FriendsCenter(MDScreen):
         self.selected_playlist_id = None
         self.playlist_map = {}
 
-        layout = MDBoxLayout(orientation='vertical')
+        self.md_bg_color = get_color_from_hex("#101320")  # Dark background
 
-        layout.add_widget(MDTopAppBar(title="Friends Center 🎶", elevation=4))
+        layout = MDBoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
 
-        self.playlist_button = MDRaisedButton(
-            text="Choose a playlist",
+        # Top App Bar
+        layout.add_widget(MDTopAppBar(
+            title="Friends Center",
+            elevation=4,
+            md_bg_color=get_color_from_hex("#1E202A"),
+            specific_text_color="white"
+        ))
+
+        # Playlist selection section
+        playlist_section = MDBoxLayout(
+            orientation='horizontal',
             size_hint_y=None,
             height=dp(48),
+            padding=(dp(10), 0),
+            spacing=dp(10)
+        )
+        self.playlist_button = MDRaisedButton(
+            text="Select Playlist",
+            size_hint=(None, None),
+            height=dp(48),
+            width=dp(200),
             pos_hint={"center_x": 0.5}
         )
-        layout.add_widget(self.playlist_button)
+        playlist_section.add_widget(self.playlist_button)
+        layout.add_widget(playlist_section)
 
+        # Friends list label
+        friend_label = MDLabel(
+            text="Friends List",
+            halign="center",
+            theme_text_color="Custom",
+            text_color=(1, 1, 1, 1),
+            font_style="H6",
+            size_hint_y=None,
+            height=dp(32)
+        )
+        layout.add_widget(friend_label)
+
+        # Friends list scroll
         scroll = MDScrollView()
         self.list_widget = MDList()
-
-
         scroll.add_widget(self.list_widget)
         layout.add_widget(scroll)
 
+        # Invitations label
         invite_label = MDLabel(
-            text="Received Invites",
+            text="Invitations Received",
             halign="center",
-            theme_text_color="Primary",
+            theme_text_color="Custom",
+            text_color=(1, 1, 1, 1),
             font_style="H6",
             size_hint_y=None,
-            height=dp(32),
-            padding=(dp(10), dp(10))
+            height=dp(32)
         )
         layout.add_widget(invite_label)
 
-        # Invite display scroll list
+        # Invitations scroll
         self.invite_scroll = MDScrollView()
         self.invite_list_widget = MDList()
         self.invite_scroll.add_widget(self.invite_list_widget)
@@ -60,6 +91,7 @@ class FriendsCenter(MDScreen):
 
         self.add_widget(layout)
 
+        # Dropdown menu setup
         self.dropdown_menu = MDDropdownMenu(
             caller=self.playlist_button,
             items=[],
@@ -76,12 +108,21 @@ class FriendsCenter(MDScreen):
         self.selected_playlist_id = self.playlist_map.get(name)
         self.dropdown_menu.dismiss()
 
+
+
     def handle_received_invites(self, invite_list):
         self.invite_list_widget.clear_widgets()
 
         if not invite_list:
             self.invite_list_widget.add_widget(
-                OneLineAvatarListItem(text="No invites received 🎁")
+                MDLabel(
+                    text="No invites received",
+                    theme_text_color="Custom",
+                    text_color=(1, 1, 1, 1),
+                    halign="center",
+                    size_hint_y=None,
+                    height=dp(40)
+                )
             )
             return
 
@@ -89,12 +130,37 @@ class FriendsCenter(MDScreen):
             from_user = invite.get("from", "Unknown Sender")
             playlist_name = invite.get("playlist_name", "Unnamed Playlist")
 
-            item = OneLineAvatarListItem(
-                text=f"{from_user} invited you to '{playlist_name}'"
+            # Create layout for each invite row
+            row = MDBoxLayout(
+                orientation="horizontal",
+                spacing=dp(10),
+                padding=(dp(10), dp(10)),
+                size_hint_y=None,
+                height=dp(60)
             )
-            item.add_widget(IconLeftWidget(icon="account"))
-            self.invite_list_widget.add_widget(item)
 
+            # Invite description label
+            label = MDLabel(
+                text=f"{from_user} invited you to playlist '{playlist_name}'",
+                theme_text_color="Custom",
+                text_color=(1, 1, 1, 1),
+                halign="left",
+                valign="middle"
+            )
+            label.bind(size=label.setter("text_size"))
+
+            # Accept button
+            accept_button = MDRaisedButton(
+                text="Accept",
+                size_hint=(None, None),
+                height=dp(36),
+                width=dp(100),
+                on_release=lambda btn, i=invite: self.accept_invite(i)
+            )
+
+            row.add_widget(label)
+            row.add_widget(accept_button)
+            self.invite_list_widget.add_widget(row)
     def build_friend_list(self):
         self.list_widget.clear_widgets()
         added = False
@@ -103,15 +169,23 @@ class FriendsCenter(MDScreen):
             if friend != self.user_email:
                 item = OneLineAvatarListItem(
                     text=friend,
-                    on_release=partial(self.invite_friend, friend)
+                    on_release=partial(self.invite_friend, friend),
+                    theme_text_color="Custom",
+                    text_color=(1, 1, 1, 1)
                 )
-                item.add_widget(IconLeftWidget(icon="account"))
+                item.add_widget(IconLeftWidget(icon="account",
+                                               theme_text_color="Custom",
+                                               text_color=(1, 1, 1, 1)
+                                               ))
                 self.list_widget.add_widget(item)
                 added = True
 
         if not added:
             self.list_widget.add_widget(
-                OneLineAvatarListItem(text="No collaborators available.")
+                OneLineAvatarListItem(text="No collaborators available.",
+                                      theme_text_color="Custom",
+                                      text_color=(1, 1, 1, 1)
+                                      )
             )
 
     def invite_friend(self, friend, *args):
@@ -192,16 +266,40 @@ class FriendsCenter(MDScreen):
             except Exception as e:
                 print("Socket close error:", e)
 
+    def accept_invite(self, invite):
+        from_user = invite.get("from")
+        playlist_id = invite.get("playlist_id")
+        playlist_name = invite.get("playlist_name", "Unnamed Playlist")
+
+        try:
+            self.socket.request_action(
+                username=self.user_email,
+                playlist_id=playlist_id,
+                action="ACCEPT",
+                target=from_user
+            )
+            MDSnackbar(f"Accepted invite from {from_user}...launching your collab session").open()
+
+            from frontend.screens.playlist_details_screen import PlaylistDetailScreen
+            if not self.manager.has_screen("playlist_detail"):
+                self.manager.add_widget(PlaylistDetailScreen(name="playlist_detail"))
+
+            screen = self.manager.get_screen("playlist_detail")
+            screen.load_playlist(None, playlist_id)  # collaboration mode
+            self.manager.current = "playlist_detail"
+
+        except Exception as e:
+            print("Accept invite error:", e)
+            MDSnackbar("Failed to accept invite").open()
+
     def fetch_invites(self):
         def _fetch_invites():
             try:
-
                 self.socket.request_invites(self.user_email, self.selected_playlist_id)
                 responses = self.socket.get_responses()
 
-                invite_list = []
-                for resp in responses:
-                    invite_list.extend(resp.get("invites", []))
+                # Preserve enriched invite dictionaries
+                invite_list = [invite for resp in responses for invite in resp if isinstance(invite, dict)]
 
                 Clock.schedule_once(lambda dt: self.handle_received_invites(invite_list))
             except Exception as e:

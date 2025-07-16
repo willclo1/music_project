@@ -163,6 +163,13 @@ async def add_song(artist: str, title: str, playlist_id: int):
         return {"status": "failure", "message": "Song not found on MusicBrainz"}
 
 
+@app.get("/get_playlist_name/{playlist_id}")
+async def get_playlist_name(playlist_id: int):
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM playlists WHERE playlist_id = %s", (playlist_id,))
+    result = cursor.fetchone()
+    return {"name": result[0] if result else "Unknown Playlist"}
+
 @app.get("/get_playlists/{user_id}")
 async def get_playlists(user_id: int):
     cursor = conn.cursor()

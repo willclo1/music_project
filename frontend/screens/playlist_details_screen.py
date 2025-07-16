@@ -74,7 +74,11 @@ class PlaylistDetailScreen(Screen):
 
     def load_playlist(self, user_email, playlist_id):
         # fetch playlist name
-        playlist_name = self.get_playlist_name(user_email, playlist_id)
+        if user_email:
+            playlist_name = self.get_playlist_name(user_email, playlist_id)
+        else:
+            playlist_name = self.get_playlist_name_by_id(playlist_id)
+
         self.title_label.text = f"[b]{playlist_name}[/b]"
 
         # fetch songs
@@ -149,6 +153,10 @@ class PlaylistDetailScreen(Screen):
             f"http://127.0.0.1:8000/get_playlists/{user_id}"
         ).json().get("playlists", [])
         return next((p["name"] for p in playlists if p["id"] == pid), "Unknown Playlist")
+
+    def get_playlist_name_by_id(self, pid):
+        resp = requests.get(f"http://127.0.0.1:8000/get_playlist_name/{pid}")
+        return resp.json().get("name", "Unknown Playlist")
 
     def get_playlist_songs(self, pid):
         resp = requests.get(f"http://127.0.0.1:8000/get_songs_in_playlist/{pid}")
