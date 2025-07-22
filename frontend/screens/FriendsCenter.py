@@ -53,6 +53,17 @@ class FriendsCenter(MDScreen):
         playlist_section.add_widget(self.playlist_button)
         layout.add_widget(playlist_section)
 
+        back_btn = MDRaisedButton(
+            text="Back to Dashboard",
+            size_hint_y=None,
+            height=dp(50),
+            md_bg_color=get_color_from_hex("#222438"),
+            text_color=(1, 1, 1, 1),
+            font_size=16
+        )
+        back_btn.bind(on_release=lambda _: setattr(self.manager, 'current', 'dashboard'))
+        layout.add_widget(back_btn)
+
         # Friends list label
         friend_label = MDLabel(
             text="Friends List",
@@ -100,8 +111,9 @@ class FriendsCenter(MDScreen):
         self.playlist_button.bind(on_release=lambda *args: self.dropdown_menu.open())
 
         self.build_friend_list()
-        self.populate_playlists()
         self.fetch_invites()
+        self.populate_playlists()
+
 
     def select_playlist(self, name):
         self.playlist_button.text = name
@@ -157,6 +169,8 @@ class FriendsCenter(MDScreen):
                 width=dp(100),
                 on_release=lambda btn, i=invite: self.accept_invite(i)
             )
+
+
 
             row.add_widget(label)
             row.add_widget(accept_button)
@@ -280,13 +294,14 @@ class FriendsCenter(MDScreen):
             )
             MDSnackbar(f"Accepted invite from {from_user}...launching your collab session").open()
 
-            from frontend.screens.playlist_details_screen import PlaylistDetailScreen
-            if not self.manager.has_screen("playlist_detail"):
-                self.manager.add_widget(PlaylistDetailScreen(name="playlist_detail"))
+            from frontend.screens.CollabEditScreen import CollabEditScreen
+            if not self.manager.has_screen("collab_edit"):
+                self.manager.add_widget(CollabEditScreen(name="collab_edit"))
 
-            screen = self.manager.get_screen("playlist_detail")
-            screen.load_playlist(None, playlist_id)  # collaboration mode
-            self.manager.current = "playlist_detail"
+            screen = self.manager.get_screen("collab_edit")
+            screen.load_collab_session(playlist_id, from_user, self.socket)
+            self.manager.current = "collab_edit"
+
 
         except Exception as e:
             print("Accept invite error:", e)

@@ -268,10 +268,14 @@ class DashboardScreen(MDScreen):
 
                 friends = set()
                 for resp in responses:
+                    # Add waiting users directly
                     friends.update(resp.get("waiting_users", []))
-                    friends.update(resp.get("active_users", []))
 
-                friends = list(friends)
+                    # Parse active_users correctly
+                    active_by_playlist = resp.get("active_users", {})
+                    if isinstance(active_by_playlist, dict):
+                        for users in active_by_playlist.values():
+                            friends.update(users)
                 Clock.schedule_once(lambda dt: self.open_friends_center(friends))
             except Exception as e:
                 print("Friend fetch error:", e)
